@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  service-a:
+    build: ./servico_a
+    ports:
+      - "8081:8081"
+    depends_on:
+      - service-b
+    environment:
+      - ENV=development
+
+  service-b:
+    build: ./servico_b
+    ports:
+      - "8080:8080"
+    environment:
+      - ENV=development
+
+  zipkin:
+    image: openzipkin/zipkin
+    ports:
+      - "9411:9411"

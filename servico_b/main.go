@@ -61,7 +61,13 @@ func weatherHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, span := tracer.Start(r.Context(), "weatherHandler")
 	defer span.End()
 
-	cep := r.URL.Query().Get("cep")
+	var request map[string]string
+	err := json.NewDecoder(r.Body).Decode(&request)
+	if err != nil {
+		http.Error(w, "invalid zipcode", http.StatusUnprocessableEntity)
+		return
+	}
+	cep := request["cep"]
 
 	res, err := http.Get("https://viacep.com.br/ws/" + cep + "/json/")
 	if err != nil {
@@ -128,7 +134,7 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	r.Get("/weather", weatherHandler)
+	r.Post("/weather", weatherHandler)
 
 	http.Handle("/", r)
 	log.Fatal(http.ListenAndServe(":8080", r))
