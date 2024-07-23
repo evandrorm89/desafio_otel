@@ -45,6 +45,7 @@ services:
     container_name: service-a
     build:
       context: ./servico_a
+      dockerfile: Dockerfile
     environment:
       - TITLE=Microservice Demo
       - EXTERNAL_CALL_URL=http://service-b:8181
@@ -63,6 +64,7 @@ services:
     container_name: service-b
     build:
       context: ./servico_b
+      dockerfile: Dockerfile
     environment:
       - TITLE=Microservice Demo 2
       - CEPURL=https://viacep.com.br/ws/%s/json/

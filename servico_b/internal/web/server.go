@@ -1,10 +1,10 @@
 package web
 
 import (
-	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"time"
@@ -15,9 +15,6 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
-
-//go:embed template/*
-var templateContent embed.FS
 
 type Webserver struct {
 	ServiceData *ServiceData
@@ -60,7 +57,7 @@ func (we *Webserver) CreateServer() *chi.Mux {
 	router.Use(middleware.Timeout(60 * time.Second))
 	// promhttp
 	// router.Handle("/metrics", promhttp.Handler())
-	router.Get("/", we.HandleRequest)
+	router.Post("/", we.HandleRequest)
 	return router
 }
 
@@ -91,9 +88,8 @@ func (h *Webserver) HandleRequest(w http.ResponseWriter, r *http.Request) {
 
 	// Buscar cep na api da viacep
 	var req *http.Request
-	var err error
 	endpoint := fmt.Sprintf(h.ServiceData.CepURL, cep)
-	req, err = http.NewRequestWithContext(ctx, h.ExternalCallMethod, endpoint, nil)
+	req, err = http.NewRequestWithContext(ctx, h.ServiceData.ExternalCallMethod, endpoint, nil)
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -121,8 +117,8 @@ func (h *Webserver) HandleRequest(w http.ResponseWriter, r *http.Request) {
 
 	location := url.QueryEscape(c.Localidade)
 
-	res, err = http.Get(fmt.Sprintf("https://api.weatherapi.com/v1/current.json?key=602ac96551be4db2b0112256243006&q=%s&aqi=no", location))
-	// res, err = http.Get(fmt.Sprintf(h.ServiceData.WeatherURL, location))
+	// res, err := http.Get(fmt.Sprintf("https://api.weatherapi.com/v1/current.json?key=602ac96551be4db2b0112256243006&q=%s&aqi=no", location))
+	res, err := http.Get(fmt.Sprintf(h.ServiceData.WeatherURL, location))
 	if err != nil {
 		http.Error(w, `{"message": "Erro ao achar o tempo atual para a localidade informada"}`, http.StatusInternalServerError)
 		return

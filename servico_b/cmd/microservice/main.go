@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"servico_b/internal/web"
 	"time"
 
-	"github.com/devfullcycle/microservices-demo/internal/web"
 	"github.com/spf13/viper"
 
 	"google.golang.org/grpc"
@@ -37,8 +37,8 @@ func initProvider(serviceName, collectorURL string) (func(context.Context) error
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
-	grpc.WithTransportCredentials(insecure.NewCredentials()),
-		conn, err := grpc.DialContext(ctx, collectorURL,
+	conn, err := grpc.DialContext(ctx, collectorURL,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 	)
 	if err != nil {
@@ -91,7 +91,6 @@ func main() {
 		Title:              viper.GetString("TITLE"),
 		CepURL:             viper.GetString("CEPURL"),
 		WeatherURL:         viper.GetString("WEATHERURL"),
-		ExternalCallURL:    viper.GetString("EXTERNAL_CALL_URL"),
 		ExternalCallMethod: viper.GetString("EXTERNAL_CALL_METHOD"),
 		RequestNameOTEL:    viper.GetString("REQUEST_NAME_OTEL"),
 		OTELTracer:         tracer,

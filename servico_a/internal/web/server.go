@@ -1,12 +1,10 @@
 package web
 
 import (
-	"embed"
+	"bytes"
 	"encoding/json"
-	"fmt"
-	"io"
+	"io/ioutil"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/go-chi/chi/middleware"
@@ -15,9 +13,6 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
-
-//go:embed template/*
-var templateContent embed.FS
 
 type Webserver struct {
 	ServiceData *ServiceData
@@ -41,7 +36,7 @@ func (we *Webserver) CreateServer() *chi.Mux {
 	router.Use(middleware.Timeout(60 * time.Second))
 	// promhttp
 	// router.Handle("/metrics", promhttp.Handler())
-	router.Get("/", we.HandleRequest)
+	router.Post("/", we.HandleRequest)
 	return router
 }
 
@@ -70,9 +65,12 @@ func (h *Webserver) HandleRequest(w http.ResponseWriter, r *http.Request) {
 
 	// Encaminhar para o Serviço B
 	var req *http.Request
-	var err error
-	reqBody, _ := json.Marshal(request)
-	req, err = http.NewRequestWithContext(ctx, "POST", h.ServiceData.ExternalCallURL, bytes.NewBuffer(reqBody))
+	reqBody, err := json.Marshal(request)
+	if err != nil {
+		http.Error(w, "error in the body", http.StatusInternalServerError)
+		return
+	}
+	req, err = http.NewRequestWithContext(ctx, h.ServiceData.ExternalCallMethod, h.ServiceData.ExternalCallURL, bytes.NewBuffer(reqBody))
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
