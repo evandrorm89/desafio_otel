@@ -1,22 +1,27 @@
-package main
+package web
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
+	"time"
 
+	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/zipkin"
-	"go.opentelemetry.io/otel/sdk/resource"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
+
+//go:embed template/*
+var templateContent embed.FS
+
+type Webserver struct {
+	ServiceData *ServiceData
+}
 
 type ViaCepResponse struct {
 	Localidade string `json:localidade`
@@ -37,28 +42,43 @@ type WeatherResponse struct {
 	Temp_k float64 `json:temp_K`
 }
 
-var tracer trace.Tracer
-
-func initProvider() {
-	exporter, err := zipkin.New("http://localhost:9411/api/v2/spans")
-	if err != nil {
-		log.Fatal(err)
+// NewServer creates a new server instance
+func NewServer(serviceData *ServiceData) *Webserver {
+	return &Webserver{
+		ServiceData: serviceData,
 	}
-
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
-		sdktrace.WithResource(resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceNameKey.String("servico_b"),
-		)),
-	)
-
-	otel.SetTracerProvider(tp)
-	tracer = otel.Tracer("servico_b")
 }
 
-func weatherHandler(w http.ResponseWriter, r *http.Request) {
-	ctx, span := tracer.Start(r.Context(), "weatherHandler")
+// createServer creates a new server instance with go chi router
+func (we *Webserver) CreateServer() *chi.Mux {
+	router := chi.NewRouter()
+
+	router.Use(middleware.RequestID)
+	router.Use(middleware.RealIP)
+	router.Use(middleware.Recoverer)
+	router.Use(middleware.Logger)
+	router.Use(middleware.Timeout(60 * time.Second))
+	// promhttp
+	// router.Handle("/metrics", promhttp.Handler())
+	router.Get("/", we.HandleRequest)
+	return router
+}
+
+type ServiceData struct {
+	Title              string
+	ExternalCallMethod string
+	CepURL             string
+	WeatherURL         string
+	RequestNameOTEL    string
+	OTELTracer         trace.Tracer
+}
+
+func (h *Webserver) HandleRequest(w http.ResponseWriter, r *http.Request) {
+	carrier := propagation.HeaderCarrier(r.Header)
+	ctx := r.Context()
+	ctx = otel.GetTextMapPropagator().Extract(ctx, carrier)
+
+	ctx, span := h.ServiceData.OTELTracer.Start(ctx, "Chamada externa"+h.ServiceData.RequestNameOTEL)
 	defer span.End()
 
 	var request map[string]string
@@ -69,14 +89,24 @@ func weatherHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	cep := request["cep"]
 
-	res, err := http.Get("https://viacep.com.br/ws/" + cep + "/json/")
+	// Buscar cep na api da viacep
+	var req *http.Request
+	var err error
+	endpoint := fmt.Sprintf(h.ServiceData.CepURL, cep)
+	req, err = http.NewRequestWithContext(ctx, h.ExternalCallMethod, endpoint, nil)
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		http.Error(w, `{"message": "can not find zip code"}`, http.StatusNotFound)
+		http.Error(w, "can not find zip code", http.StatusNotFound)
 		return
 	}
-	defer res.Body.Close()
+	defer resp.Body.Close()
 
-	body, err := io.ReadAll(res.Body)
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	var c ViaCepResponse
 	err = json.Unmarshal(body, &c)
 	if err != nil {
@@ -92,6 +122,7 @@ func weatherHandler(w http.ResponseWriter, r *http.Request) {
 	location := url.QueryEscape(c.Localidade)
 
 	res, err = http.Get(fmt.Sprintf("https://api.weatherapi.com/v1/current.json?key=602ac96551be4db2b0112256243006&q=%s&aqi=no", location))
+	// res, err = http.Get(fmt.Sprintf(h.ServiceData.WeatherURL, location))
 	if err != nil {
 		http.Error(w, `{"message": "Erro ao achar o tempo atual para a localidade informada"}`, http.StatusInternalServerError)
 		return
@@ -122,20 +153,7 @@ func weatherHandler(w http.ResponseWriter, r *http.Request) {
 		Temp_f: tempF,
 		Temp_k: tempK,
 	}
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
-}
 
-func main() {
-	initProvider()
-
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-
-	r.Post("/weather", weatherHandler)
-
-	http.Handle("/", r)
-	log.Fatal(http.ListenAndServe(":8080", r))
 }
