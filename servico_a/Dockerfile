@@ -10,7 +10,9 @@ COPY . .
 
 RUN go mod tidy
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build --ldflags="-w -s" -o bin/main ./cmd/microservice
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags "!backup" --ldflags="-w -s" -o bin/main ./cmd/microservice
+
+RUN go test -v ./...
 
 FROM alpine:latest
 

@@ -1,25 +1,10 @@
 version: '3'
 services:
-  # jaeger-all-in-one:
-  #   image: jaegertracing/all-in-one:latest
-  #   restart: always
-  #   ports:
-  #     - "16686:16686"
-  #     - "14268"
-  #     - "14250"
   zipkin:
     image: openzipkin/zipkin:latest
     restart: always
     ports:
       - "9411:9411"
-  # prometheus:
-  #   container_name: prometheus
-  #   image: prom/prometheus:latest
-  #   restart: always
-  #   volumes:
-  #     - ./.docker/prometheus.yaml:/etc/prometheus/prometheus.yml
-  #   ports:
-  #     - "9090:9090"
 
   otel-collector:
     image: otel/opentelemetry-collector:latest
@@ -32,14 +17,6 @@ services:
       - "8889:8889"   # Prometheus exporter metrics
       - "4317:4317"   # OTLP gRPC receiver
 
-  # grafana:
-  #   container_name: grafana
-  #   image: grafana/grafana:latest
-  #   restart: always
-  #   ports:
-  #     - "3001:3000"
-  #   depends_on:
-  #     - prometheus
 
   service-a:
     container_name: service-a

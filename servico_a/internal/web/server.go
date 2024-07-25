@@ -59,7 +59,9 @@ func (h *Webserver) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	var request map[string]string
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil || len(request["cep"]) != 8 {
-		http.Error(w, "invalid zipcode", http.StatusUnprocessableEntity)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		json.NewEncoder(w).Encode(map[string]string{"message": "invalid zipcode"})
 		return
 	}
 
@@ -74,10 +76,19 @@ func (h *Webserver) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		http.Error(w, "can not find zipcode", http.StatusNotFound)
+		w.Header().Set("Content-Type", "application/json")
+		http.Error(w, "Could not complete the request", http.StatusInternalServerError)
 		return
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := ioutil.ReadAll(resp.Body)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(resp.StatusCode)
+		w.Write(body)
+		return
+	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -86,5 +97,4 @@ func (h *Webserver) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(body)
-
 }

@@ -34,6 +34,7 @@ type Current struct {
 }
 
 type WeatherResponse struct {
+	City   string  `json:"city"`
 	Temp_c float64 `json:temp_C`
 	Temp_f float64 `json:temp_F`
 	Temp_k float64 `json:temp_K`
@@ -55,8 +56,6 @@ func (we *Webserver) CreateServer() *chi.Mux {
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.Logger)
 	router.Use(middleware.Timeout(60 * time.Second))
-	// promhttp
-	// router.Handle("/metrics", promhttp.Handler())
 	router.Post("/", we.HandleRequest)
 	return router
 }
@@ -117,7 +116,7 @@ func (h *Webserver) HandleRequest(w http.ResponseWriter, r *http.Request) {
 
 	location := url.QueryEscape(c.Localidade)
 
-	// res, err := http.Get(fmt.Sprintf("https://api.weatherapi.com/v1/current.json?key=602ac96551be4db2b0112256243006&q=%s&aqi=no", location))
+	// buscar o clima da localidade
 	res, err := http.Get(fmt.Sprintf(h.ServiceData.WeatherURL, location))
 	if err != nil {
 		http.Error(w, `{"message": "Erro ao achar o tempo atual para a localidade informada"}`, http.StatusInternalServerError)
@@ -145,6 +144,7 @@ func (h *Webserver) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	tempK := t.Current.Temp_c + 273.0
 
 	response := WeatherResponse{
+		City:   c.Localidade,
 		Temp_c: tempC,
 		Temp_f: tempF,
 		Temp_k: tempK,
