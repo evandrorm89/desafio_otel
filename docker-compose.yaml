@@ -1,0 +1,59 @@
+version: '3'
+services:
+  zipkin:
+    image: openzipkin/zipkin:latest
+    restart: always
+    ports:
+      - "9411:9411"
+
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    restart: always
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./.docker/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "8888:8888"   # Prometheus metrics exposed by the collector
+      - "8889:8889"   # Prometheus exporter metrics
+      - "4317:4317"   # OTLP gRPC receiver
+
+
+  service-a:
+    container_name: service-a
+    build:
+      context: ./servico_a
+      dockerfile: Dockerfile
+    environment:
+      - TITLE=Microservice Demo
+      - EXTERNAL_CALL_URL=http://service-b:8181
+      - EXTERNAL_CALL_METHOD=POST
+      - REQUEST_NAME_OTEL=microservice-demo-request
+      - OTEL_SERVICE_NAME=microservice-demo
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - HTTP_PORT=:8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      - zipkin
+      - otel-collector
+
+  service-b:
+    container_name: service-b
+    build:
+      context: ./servico_b
+      dockerfile: Dockerfile
+    environment:
+      - TITLE=Microservice Demo 2
+      - CEPURL=https://viacep.com.br/ws/%s/json/
+      - WEATHERURL=https://api.weatherapi.com/v1/current.json?key=602ac96551be4db2b0112256243006&q=%s&aqi=no
+      - EXTERNAL_CALL_METHOD=GET
+      - REQUEST_NAME_OTEL=microservice-demo2-request
+      - OTEL_SERVICE_NAME=microservice-demo2
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - HTTP_PORT=:8181
+    ports:
+      - "8181:8181"
+    depends_on:
+      - zipkin
+      - otel-collector
+
