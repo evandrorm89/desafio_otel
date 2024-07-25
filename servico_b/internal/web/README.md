@@ -1,6 +1,6 @@
-esafio Open Telemetry para a pós Goexpert
+Desafio Open Telemetry para a pós Goexpert
 
-Para rodar o projeto, basta ir para a raiz e rodar docker-compose up --build para subir os containers do serviço A e B e também o do zipkin com Open Telemetry
+Para rodar o projeto, basta ir para a raiz e rodar o seguinte comando: **docker-compose up --build** para subir os containers do serviço A e B e também o do zipkin com Open Telemetry
 
 Os arquivos Docker buildam cada serviço juntamente com os testes unitários e de integração rodados
 
