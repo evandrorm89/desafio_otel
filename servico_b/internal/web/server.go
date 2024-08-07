@@ -85,6 +85,8 @@ func (h *Webserver) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	cep := request["cep"]
 
+	ctx, spanCep := h.ServiceData.OTELTracer.Start(ctx, "getCEP")
+
 	// Buscar cep na api da viacep
 	var req *http.Request
 	endpoint := fmt.Sprintf(h.ServiceData.CepURL, cep)
@@ -114,7 +116,11 @@ func (h *Webserver) HandleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	spanCep.End()
+
 	location := url.QueryEscape(c.Localidade)
+
+	ctx, spanWeather := h.ServiceData.OTELTracer.Start(ctx, "getWeather")
 
 	// buscar o clima da localidade
 	res, err := http.Get(fmt.Sprintf(h.ServiceData.WeatherURL, location))
@@ -138,6 +144,8 @@ func (h *Webserver) HandleRequest(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 		return
 	}
+
+	spanWeather.End()
 
 	tempC := t.Current.Temp_c
 	tempF := t.Current.Temp_f

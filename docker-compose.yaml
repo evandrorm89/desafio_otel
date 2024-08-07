@@ -27,8 +27,8 @@ services:
       - TITLE=Microservice Demo
       - EXTERNAL_CALL_URL=http://service-b:8181
       - EXTERNAL_CALL_METHOD=POST
-      - REQUEST_NAME_OTEL=microservice-demo-request
-      - OTEL_SERVICE_NAME=microservice-demo
+      - REQUEST_NAME_OTEL=service-a-request
+      - OTEL_SERVICE_NAME=service-a
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
       - HTTP_PORT=:8080
     ports:
@@ -47,8 +47,8 @@ services:
       - CEPURL=https://viacep.com.br/ws/%s/json/
       - WEATHERURL=https://api.weatherapi.com/v1/current.json?key=602ac96551be4db2b0112256243006&q=%s&aqi=no
       - EXTERNAL_CALL_METHOD=GET
-      - REQUEST_NAME_OTEL=microservice-demo2-request
-      - OTEL_SERVICE_NAME=microservice-demo2
+      - REQUEST_NAME_OTEL=service-b-request
+      - OTEL_SERVICE_NAME=service-b
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
       - HTTP_PORT=:8181
     ports:
